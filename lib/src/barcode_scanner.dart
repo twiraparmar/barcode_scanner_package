@@ -25,7 +25,7 @@ class BarcodeScanner extends StatefulWidget {
   final Function(Exception)? onError;
 
   const BarcodeScanner({
-    Key? key,
+    super.key,
     this.formats = const [custom.BarcodeFormat.all],
     this.cameraFacing = custom.CameraFacing.back,
     this.autoFocus = true,
@@ -37,7 +37,7 @@ class BarcodeScanner extends StatefulWidget {
     this.fit = BoxFit.cover,
     this.onScan,
     this.onError,
-  }) : super(key: key);
+  });
 
   @override
   _BarcodeScannerState createState() => _BarcodeScannerState();
@@ -235,7 +235,7 @@ class _BarcodeScannerState extends State<BarcodeScanner> {
   Widget _buildScanningOverlay() {
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.white.withOpacity(0.3), width: 2),
+        border: Border.all(color: Colors.white.withAlpha(1), width: 2),
         borderRadius: BorderRadius.circular(12),
       ),
       margin: EdgeInsets.all(40),
@@ -354,39 +354,3 @@ extension on custom.BarcodeFormat {
   }
 }
 
-extension on custom.BarcodeFormat {
-  custom.BarcodeFormat toBarcodeFormat() {
-    switch (this) {
-      case custom.BarcodeFormat.aztec:
-        return custom.BarcodeFormat.aztec;
-      case custom.BarcodeFormat.code128:
-        return custom.BarcodeFormat.code128;
-      case custom.BarcodeFormat.code39:
-        return custom.BarcodeFormat.code39;
-      case custom.BarcodeFormat.code93:
-        return custom.BarcodeFormat.code93;
-      case custom.BarcodeFormat.codabar:
-        return custom.BarcodeFormat.codabar;
-      case custom.BarcodeFormat.dataMatrix:
-        return custom.BarcodeFormat.dataMatrix;
-      case custom.BarcodeFormat.ean8:
-        return custom.BarcodeFormat.ean8;
-      case custom.BarcodeFormat.ean13:
-        return custom.BarcodeFormat.ean13;
-      case custom.BarcodeFormat.itf:
-        return custom.BarcodeFormat.itf;
-      case custom.BarcodeFormat.pdf417:
-        return custom.BarcodeFormat.pdf417;
-      case custom.BarcodeFormat.qrCode:
-        return custom.BarcodeFormat.qrCode;
-      case custom.BarcodeFormat.upcA:
-        return custom.BarcodeFormat.upcA;
-      case custom.BarcodeFormat.upcE:
-        return custom.BarcodeFormat.upcE;
-      case custom.BarcodeFormat.all:
-        return custom.BarcodeFormat.all;
-      default:
-        return custom.BarcodeFormat.qrCode;
-    }
-  }
-}

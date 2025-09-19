@@ -1,7 +1,8 @@
-name: test_package
-description: "A new Flutter project."
+name: barcode_scanner_flutter
+description: A custom barcode scanner package for Flutter
 version: 0.0.1
-homepage:
+homepage: https://github.com/twiraparmar/barcode_scanner_package
+repository: https://github.com/twiraparmar/barcode_scanner_package
 
 environment:
   sdk: ">=3.6.0 <4.0.0"

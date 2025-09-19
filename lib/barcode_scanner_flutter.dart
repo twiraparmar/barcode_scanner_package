@@ -1,4 +1,4 @@
-library barcode_scanner_flutter;
+library;
 
 export 'src/barcode_scanner.dart';
 export 'src/barcode_types.dart';
