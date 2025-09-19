@@ -1,39 +1,19 @@
-<!--
-This README describes the package. If you publish this package to pub.dev,
-this README's contents appear on the landing page for your package.
+# barcode_scanner_flutter
 
-For information about how to write a good package README, see the guide for
-[writing package pages](https://dart.dev/tools/pub/writing-package-pages).
-
-For general information about developing packages, see the Dart guide for
-[creating packages](https://dart.dev/guides/libraries/create-packages)
-and the Flutter guide for
-[developing packages and plugins](https://flutter.dev/to/develop-packages).
--->
-
-TODO: Put a short description of the package here that helps potential users
-know whether this package might be useful for them.
+A Flutter package to easily scan barcodes and QR codes using device cameras. Supports multiple barcode formats including QR, EAN, UPC, Code128, and more. Compatible with Android and iOS.
 
 ## Features
 
-TODO: List what your package can do. Maybe include images, gifs, or videos.
+- Scan QR codes, barcodes, and Aztec codes
+- Supports multiple formats: QR, EAN8, EAN13, UPC-A, UPC-E, Code39, Code93, Code128, PDF417, ITF, DataMatrix, Codabar
+- Easy integration with Flutter apps
+- Lightweight and efficient
+- Customizable camera preview
 
-## Getting started
+## Getting Started
 
-TODO: List prerequisites and provide or point to information on how to
-start using the package.
+Add this to your `pubspec.yaml`:
 
-## Usage
-
-TODO: Include short and useful examples for package users. Add longer examples
-to `/example` folder.
-
-```dart
-const like = 'sample';
-```
-
-## Additional information
-
-TODO: Tell users more about the package: where to find more information, how to
-contribute to the package, how to file issues, what response they can expect
-from the package authors, and more.
+```yaml
+dependencies:
+  barcode_scanner_flutter: ^0.0.1
