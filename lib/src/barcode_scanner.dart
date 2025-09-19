@@ -9,7 +9,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart' as mlkit;
 
-import '../barcode_scanner_flutter.dart' as custom;
+import '../barcode_scanner_package.dart' as custom;
 
 class BarcodeScanner extends StatefulWidget {
   final List<custom.BarcodeFormat> formats;

@@ -1,4 +1,4 @@
-# barcode_scanner_flutter
+# barcode_scanner_package
 
 A Flutter package to easily scan barcodes and QR codes using device cameras. Supports multiple barcode formats including QR, EAN, UPC, Code128, and more. Compatible with Android and iOS.
 
@@ -16,4 +16,4 @@ Add this to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  barcode_scanner_flutter: ^0.0.1
+  barcode_scanner_package: ^0.0.1

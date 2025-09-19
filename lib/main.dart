@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'barcode_scanner_flutter.dart';
+import 'barcode_scanner_package.dart';
 
 void main() {
   runApp(const MyApp());

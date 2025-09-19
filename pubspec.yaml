@@ -1,4 +1,4 @@
-name: barcode_scanner_flutter
+name: barcode_scanner_package
 description: A custom barcode scanner package for Flutter
 version: 0.0.1
 homepage: https://github.com/twiraparmar/barcode_scanner_package
@@ -28,7 +28,7 @@ flutter:
   plugin:
     platforms:
       android:
-        package: com.example.barcode_scanner_flutter
+        package: com.example.barcode_scanner_package
         pluginClass: BarcodeScannerFlutterPlugin
       ios:
         pluginClass: BarcodeScannerFlutterPlugin
