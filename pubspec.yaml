@@ -1,12 +1,14 @@
 name: barcode_scanner_package
-description: A custom barcode scanner package for Flutter
-version: 0.0.1
+description: A custom barcode scanner package for Flutter with camera preview and ML Kit integration
+version: 1.0.0
 homepage: https://github.com/twiraparmar/barcode_scanner_package
 repository: https://github.com/twiraparmar/barcode_scanner_package
+issue_tracker: https://github.com/twiraparmar/barcode_scanner_package/issues
+documentation: https://github.com/twiraparmar/barcode_scanner_package#readme
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
-  flutter: ">=1.20.0"
+  flutter: ">=3.0.0"
 
 dependencies:
   flutter:

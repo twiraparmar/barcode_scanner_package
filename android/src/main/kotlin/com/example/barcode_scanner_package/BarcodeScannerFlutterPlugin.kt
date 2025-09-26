@@ -15,17 +15,32 @@ class BarcodeScannerFlutterPlugin: FlutterPlugin, MethodCallHandler {
   /// This local reference serves to register the plugin with the Flutter Engine and unregister it
   /// when the Flutter Engine is detached from the Activity
   private lateinit var channel : MethodChannel
+  private lateinit var flutterPluginBinding: FlutterPlugin.FlutterPluginBinding
 
   override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
+    this.flutterPluginBinding = flutterPluginBinding
     channel = MethodChannel(flutterPluginBinding.binaryMessenger, "barcode_scanner_package")
     channel.setMethodCallHandler(this)
   }
 
   override fun onMethodCall(call: MethodCall, result: Result) {
-    if (call.method == "getPlatformVersion") {
-      result.success("Android ${android.os.Build.VERSION.RELEASE}")
-    } else {
-      result.notImplemented()
+    when (call.method) {
+      "getPlatformVersion" -> {
+        result.success("Android ${android.os.Build.VERSION.RELEASE}")
+      }
+      "hasCamera" -> {
+        // Check if device has camera
+        val hasCamera = flutterPluginBinding.applicationContext.packageManager
+          .hasSystemFeature(android.content.pm.PackageManager.FEATURE_CAMERA)
+        result.success(hasCamera)
+      }
+      "requestCameraPermission" -> {
+        // This should be handled by the permission_handler plugin
+        result.success(true)
+      }
+      else -> {
+        result.notImplemented()
+      }
     }
   }
 

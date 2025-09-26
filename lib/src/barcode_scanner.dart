@@ -1,5 +1,3 @@
-
-
 import 'dart:async';
 import 'dart:io';
 
@@ -7,13 +5,15 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart' as mlkit;
+import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart'
+    as mlkit;
 
-import '../barcode_scanner_package.dart' as custom;
+import 'barcode_types.dart';
+import '../exceptions.dart';
 
 class BarcodeScanner extends StatefulWidget {
-  final List<custom.BarcodeFormat> formats;
-  final custom.CameraFacing cameraFacing;
+  final List<BarcodeFormat> formats;
+  final CameraFacing cameraFacing;
   final bool autoFocus;
   final bool enableTapToFocus;
   final bool enablePinchToZoom;
@@ -21,26 +21,50 @@ class BarcodeScanner extends StatefulWidget {
   final Widget? loadingWidget;
   final Widget? errorWidget;
   final BoxFit fit;
-  final Function(custom.BarcodeResult)? onScan;
+  final Function(BarcodeResult)? onScan;
   final Function(Exception)? onError;
+
+  // Customization options
+  final Color scanningLineColor;
+  final double scanningLineHeight;
+  final Duration scanningLineDuration;
+  final Color cornerBracketColor;
+  final double cornerBracketWidth;
+  final double scanningAreaSize;
+  final Color overlayColor;
+  final String scanningInstructionText;
+  final bool showInstructions;
+  final bool showScanningLine;
 
   const BarcodeScanner({
     super.key,
-    this.formats = const [custom.BarcodeFormat.all],
-    this.cameraFacing = custom.CameraFacing.back,
+    this.formats = const [BarcodeFormat.all],
+    this.cameraFacing = CameraFacing.back,
     this.autoFocus = true,
     this.enableTapToFocus = true,
     this.enablePinchToZoom = true,
-    this.scanInterval = const Duration(milliseconds: 500),
+    this.scanInterval = const Duration(milliseconds: 1000),
     this.loadingWidget,
     this.errorWidget,
     this.fit = BoxFit.cover,
     this.onScan,
     this.onError,
+
+    // Customization defaults
+    this.scanningLineColor = Colors.green,
+    this.scanningLineHeight = 2.0,
+    this.scanningLineDuration = const Duration(seconds: 2),
+    this.cornerBracketColor = Colors.green,
+    this.cornerBracketWidth = 3.0,
+    this.scanningAreaSize = 250.0,
+    this.overlayColor = Colors.black,
+    this.scanningInstructionText = 'Position barcode within the frame',
+    this.showInstructions = true,
+    this.showScanningLine = true,
   });
 
   @override
-  _BarcodeScannerState createState() => _BarcodeScannerState();
+  State<BarcodeScanner> createState() => _BarcodeScannerState();
 
   static Future<bool> get hasCamera async {
     try {
@@ -57,17 +81,34 @@ class BarcodeScanner extends StatefulWidget {
   }
 }
 
-class _BarcodeScannerState extends State<BarcodeScanner> {
+class _BarcodeScannerState extends State<BarcodeScanner>
+    with TickerProviderStateMixin {
   CameraController? _controller;
   late mlkit.BarcodeScanner _barcodeScanner;
   bool _isInitialized = false;
   bool _hasError = false;
   double _zoomLevel = 1.0;
   Timer? _scanTimer;
+  late AnimationController _scanAnimationController;
+  late Animation<double> _scanAnimation;
 
   @override
   void initState() {
     super.initState();
+    _scanAnimationController = AnimationController(
+      duration: widget.scanningLineDuration,
+      vsync: this,
+    );
+    _scanAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _scanAnimationController,
+      curve: Curves.easeInOut,
+    ));
+    if (widget.showScanningLine) {
+      _scanAnimationController.repeat(reverse: true);
+    }
     _initializeScanner();
   }
 
@@ -76,6 +117,7 @@ class _BarcodeScannerState extends State<BarcodeScanner> {
     _scanTimer?.cancel();
     _controller?.dispose();
     _barcodeScanner.close();
+    _scanAnimationController.dispose();
     super.dispose();
   }
 
@@ -83,19 +125,20 @@ class _BarcodeScannerState extends State<BarcodeScanner> {
     try {
       // Check camera permission
       if (!await BarcodeScanner.requestCameraPermission()) {
-        throw custom.CameraPermissionDeniedException();
+        throw CameraPermissionDeniedException();
       }
 
       // Get available cameras
       final cameras = await availableCameras();
       if (cameras.isEmpty) {
-        throw custom.CameraNotAvailableException();
+        throw CameraNotAvailableException();
       }
 
       // Select camera based on facing
       final camera = cameras.firstWhere(
-            (camera) => camera.lensDirection ==
-            (widget.cameraFacing == custom.CameraFacing.back
+        (camera) =>
+            camera.lensDirection ==
+            (widget.cameraFacing == CameraFacing.back
                 ? CameraLensDirection.back
                 : CameraLensDirection.front),
         orElse: () => cameras.first,
@@ -112,7 +155,10 @@ class _BarcodeScannerState extends State<BarcodeScanner> {
 
       // Initialize barcode scanner
 // Ensure conversion returns mlkit.BarcodeFormat
-      final formats = widget.formats.map((f) => f.toMlKitFormat()).toList().cast<mlkit.BarcodeFormat>();
+      final formats = widget.formats
+          .map((f) => f.toMlKitFormat())
+          .toList()
+          .cast<mlkit.BarcodeFormat>();
 
       _barcodeScanner = mlkit.BarcodeScanner(formats: formats);
 
@@ -127,7 +173,7 @@ class _BarcodeScannerState extends State<BarcodeScanner> {
         _hasError = true;
       });
       widget.onError?.call(
-        e is custom.BarcodeScannerException ? e : custom.ScannerInitializationException(e),
+        e is BarcodeScannerException ? e : ScannerInitializationException(e),
       );
     }
   }
@@ -137,31 +183,43 @@ class _BarcodeScannerState extends State<BarcodeScanner> {
       if (_controller == null || !_controller!.value.isInitialized) return;
 
       try {
+        // Check if camera is ready and not busy
+        if (_controller!.value.isTakingPicture) return;
+
         final image = await _controller!.takePicture();
         final inputImage = mlkit.InputImage.fromFilePath(image.path);
         final barcodes = await _barcodeScanner.processImage(inputImage);
 
         if (barcodes.isNotEmpty) {
           final barcode = barcodes.first;
-          final result = custom.BarcodeResult(
-            rawValue: barcode.rawValue ?? '',
-            format: barcode.format.toCustomFormat(),
+          if (barcode.rawValue != null && barcode.rawValue!.isNotEmpty) {
+            final result = BarcodeResult(
+              rawValue: barcode.rawValue!,
+              format: barcode.format.toCustomFormat(),
+              displayValue: barcode.displayValue,
+            );
 
-            displayValue: barcode.displayValue,
-          );
-
-          widget.onScan?.call(result);
+            widget.onScan?.call(result);
+          }
         }
 
         // Clean up the image file
-        await File(image.path).delete();
+        try {
+          await File(image.path).delete();
+        } catch (e) {
+          // Ignore file deletion errors
+        }
       } catch (e) {
-        widget.onError?.call(custom.BarcodeScannerException('Scan failed', e));
+        // Filter out common camera busy errors
+        final errorMessage = e.toString().toLowerCase();
+        if (!errorMessage.contains('camera') ||
+            !errorMessage.contains('busy') ||
+            !errorMessage.contains('exception')) {
+          widget.onError?.call(BarcodeScannerException('Scan failed', e));
+        }
       }
     });
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -233,124 +291,289 @@ class _BarcodeScannerState extends State<BarcodeScanner> {
   }
 
   Widget _buildScanningOverlay() {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.white.withAlpha(1), width: 2),
-        borderRadius: BorderRadius.circular(12),
+    return Stack(
+      children: [
+        // Semi-transparent overlay
+        Container(
+          color: widget.overlayColor.withOpacity(0.5),
+        ),
+        // Scanning area
+        Center(
+          child: Container(
+            width: widget.scanningAreaSize,
+            height: widget.scanningAreaSize,
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.white, width: 2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Stack(
+              children: [
+                // Animated scanning line
+                if (widget.showScanningLine) _buildScanningLine(),
+                // Corner brackets
+                _buildCornerBrackets(),
+                // Scanning text
+                _buildScanningText(),
+              ],
+            ),
+          ),
+        ),
+        // Instructions
+        if (widget.showInstructions) _buildInstructions(),
+      ],
+    );
+  }
+
+  Widget _buildScanningLine() {
+    return AnimatedBuilder(
+      animation: _scanAnimation,
+      builder: (context, child) {
+        
+        return Positioned(
+          top: _scanAnimation.value * widget.scanningAreaSize,
+          left: 0,
+          right: 0,
+          child: Container(
+            height: widget.scanningLineHeight,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.transparent,
+                  widget.scanningLineColor,
+                  Colors.transparent,
+                ],
+                stops: [0.0, 0.5, 1.0],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCornerBrackets() {
+    return Stack(
+      children: [
+        // Top left
+        Positioned(
+          top: 0,
+          left: 0,
+          child: Container(
+            width: 20,
+            height: 20,
+            decoration: BoxDecoration(
+              border: Border(
+                top: BorderSide(
+                    color: widget.cornerBracketColor,
+                    width: widget.cornerBracketWidth),
+                left: BorderSide(
+                    color: widget.cornerBracketColor,
+                    width: widget.cornerBracketWidth),
+              ),
+            ),
+          ),
+        ),
+        // Top right
+        Positioned(
+          top: 0,
+          right: 0,
+          child: Container(
+            width: 20,
+            height: 20,
+            decoration: BoxDecoration(
+              border: Border(
+                top: BorderSide(
+                    color: widget.cornerBracketColor,
+                    width: widget.cornerBracketWidth),
+                right: BorderSide(
+                    color: widget.cornerBracketColor,
+                    width: widget.cornerBracketWidth),
+              ),
+            ),
+          ),
+        ),
+        // Bottom left
+        Positioned(
+          bottom: 0,
+          left: 0,
+          child: Container(
+            width: 20,
+            height: 20,
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                    color: widget.cornerBracketColor,
+                    width: widget.cornerBracketWidth),
+                left: BorderSide(
+                    color: widget.cornerBracketColor,
+                    width: widget.cornerBracketWidth),
+              ),
+            ),
+          ),
+        ),
+        // Bottom right
+        Positioned(
+          bottom: 0,
+          right: 0,
+          child: Container(
+            width: 20,
+            height: 20,
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                    color: widget.cornerBracketColor,
+                    width: widget.cornerBracketWidth),
+                right: BorderSide(
+                    color: widget.cornerBracketColor,
+                    width: widget.cornerBracketWidth),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildScanningText() {
+    return Positioned(
+      bottom: -40,
+      left: 0,
+      right: 0,
+      child: Center(
+        child: Text(
+          widget.scanningInstructionText,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
       ),
-      margin: EdgeInsets.all(40),
-      child: CustomPaint(
-        painter: _ScannerOverlayPainter(),
+    );
+  }
+
+  Widget _buildInstructions() {
+    return Positioned(
+      bottom: 100,
+      left: 20,
+      right: 20,
+      child: Column(
+        children: [
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.7),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              'Point your camera at a barcode or QR code',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildInstructionItem(Icons.touch_app, 'Tap to focus'),
+              _buildInstructionItem(Icons.zoom_in, 'Pinch to zoom'),
+            ],
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildInstructionItem(IconData icon, String text) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: Colors.white70, size: 16),
+        SizedBox(width: 4),
+        Text(
+          text,
+          style: TextStyle(
+            color: Colors.white70,
+            fontSize: 12,
+          ),
+        ),
+      ],
     );
   }
 }
 
 extension MlKitFormatX on mlkit.BarcodeFormat {
-  custom.BarcodeFormat toCustomFormat() {
+  BarcodeFormat toCustomFormat() {
     switch (this) {
       case mlkit.BarcodeFormat.aztec:
-        return custom.BarcodeFormat.aztec;
+        return BarcodeFormat.aztec;
       case mlkit.BarcodeFormat.code128:
-        return custom.BarcodeFormat.code128;
+        return BarcodeFormat.code128;
       case mlkit.BarcodeFormat.code39:
-        return custom.BarcodeFormat.code39;
+        return BarcodeFormat.code39;
       case mlkit.BarcodeFormat.code93:
-        return custom.BarcodeFormat.code93;
+        return BarcodeFormat.code93;
       case mlkit.BarcodeFormat.codabar:
-        return custom.BarcodeFormat.codabar;
+        return BarcodeFormat.codabar;
       case mlkit.BarcodeFormat.dataMatrix:
-        return custom.BarcodeFormat.dataMatrix;
+        return BarcodeFormat.dataMatrix;
       case mlkit.BarcodeFormat.ean8:
-        return custom.BarcodeFormat.ean8;
+        return BarcodeFormat.ean8;
       case mlkit.BarcodeFormat.ean13:
-        return custom.BarcodeFormat.ean13;
+        return BarcodeFormat.ean13;
       case mlkit.BarcodeFormat.itf:
-        return custom.BarcodeFormat.itf;
+        return BarcodeFormat.itf;
       case mlkit.BarcodeFormat.pdf417:
-        return custom.BarcodeFormat.pdf417;
+        return BarcodeFormat.pdf417;
       case mlkit.BarcodeFormat.qrCode:
-        return custom.BarcodeFormat.qrCode;
+        return BarcodeFormat.qrCode;
       case mlkit.BarcodeFormat.upca:
-        return custom.BarcodeFormat.upcA;
+        return BarcodeFormat.upcA;
       case mlkit.BarcodeFormat.upce:
-        return custom.BarcodeFormat.upcE;
+        return BarcodeFormat.upcE;
       case mlkit.BarcodeFormat.all:
-        return custom.BarcodeFormat.all;
+        return BarcodeFormat.all;
       case mlkit.BarcodeFormat.unknown:
-        // TODO: Handle this case.
-        throw UnimplementedError();
+        return BarcodeFormat.all;
     }
   }
 }
 
-
-class _ScannerOverlayPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke;
-
-    // Draw corners
-    final cornerLength = 20.0;
-
-    // Top left
-    canvas.drawLine(Offset(0, 0), Offset(cornerLength, 0), paint);
-    canvas.drawLine(Offset(0, 0), Offset(0, cornerLength), paint);
-
-    // Top right
-    canvas.drawLine(Offset(size.width, 0), Offset(size.width - cornerLength, 0), paint);
-    canvas.drawLine(Offset(size.width, 0), Offset(size.width, cornerLength), paint);
-
-    // Bottom left
-    canvas.drawLine(Offset(0, size.height), Offset(cornerLength, size.height), paint);
-    canvas.drawLine(Offset(0, size.height), Offset(0, size.height - cornerLength), paint);
-
-    // Bottom right
-    canvas.drawLine(Offset(size.width, size.height), Offset(size.width - cornerLength, size.height), paint);
-    canvas.drawLine(Offset(size.width, size.height), Offset(size.width, size.height - cornerLength), paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
 // Extension methods for format conversion
-// Extension methods for format conversion
-extension on custom.BarcodeFormat {
-  custom.BarcodeFormat toMlKitFormat() {
+extension BarcodeFormatX on BarcodeFormat {
+  mlkit.BarcodeFormat toMlKitFormat() {
     switch (this) {
-      case custom.BarcodeFormat.aztec:
-        return custom.BarcodeFormat.aztec;
-      case custom.BarcodeFormat.code128:
-        return custom.BarcodeFormat.code128;
-      case custom.BarcodeFormat.code39:
-        return custom.BarcodeFormat.code39;
-      case custom.BarcodeFormat.code93:
-        return custom.BarcodeFormat.code93;
-      case custom.BarcodeFormat.codabar:
-        return custom.BarcodeFormat.codabar;
-      case custom.BarcodeFormat.dataMatrix:
-        return custom.BarcodeFormat.dataMatrix;
-      case custom.BarcodeFormat.ean8:
-        return custom.BarcodeFormat.ean8;
-      case custom.BarcodeFormat.ean13:
-        return custom.BarcodeFormat.ean13;
-      case custom.BarcodeFormat.itf:
-        return custom.BarcodeFormat.itf;
-      case custom.BarcodeFormat.pdf417:
-        return custom.BarcodeFormat.pdf417;
-      case custom.BarcodeFormat.qrCode:
-        return custom.BarcodeFormat.qrCode;
-      case custom.BarcodeFormat.upcA:
-        return custom.BarcodeFormat.upcA;
-      case custom.BarcodeFormat.upcE:
-        return custom.BarcodeFormat.upcE;
-      case custom.BarcodeFormat.all:
-        return custom.BarcodeFormat.all;
+      case BarcodeFormat.aztec:
+        return mlkit.BarcodeFormat.aztec;
+      case BarcodeFormat.code128:
+        return mlkit.BarcodeFormat.code128;
+      case BarcodeFormat.code39:
+        return mlkit.BarcodeFormat.code39;
+      case BarcodeFormat.code93:
+        return mlkit.BarcodeFormat.code93;
+      case BarcodeFormat.codabar:
+        return mlkit.BarcodeFormat.codabar;
+      case BarcodeFormat.dataMatrix:
+        return mlkit.BarcodeFormat.dataMatrix;
+      case BarcodeFormat.ean8:
+        return mlkit.BarcodeFormat.ean8;
+      case BarcodeFormat.ean13:
+        return mlkit.BarcodeFormat.ean13;
+      case BarcodeFormat.itf:
+        return mlkit.BarcodeFormat.itf;
+      case BarcodeFormat.pdf417:
+        return mlkit.BarcodeFormat.pdf417;
+      case BarcodeFormat.qrCode:
+        return mlkit.BarcodeFormat.qrCode;
+      case BarcodeFormat.upcA:
+        return mlkit.BarcodeFormat.upca;
+      case BarcodeFormat.upcE:
+        return mlkit.BarcodeFormat.upce;
+      case BarcodeFormat.all:
+        return mlkit.BarcodeFormat.all;
     }
   }
 }
-

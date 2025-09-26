@@ -12,6 +12,12 @@ public class BarcodeScannerFlutterPlugin: NSObject, FlutterPlugin {
     switch call.method {
     case "getPlatformVersion":
       result("iOS " + UIDevice.current.systemVersion)
+    case "hasCamera":
+      let hasCamera = UIImagePickerController.isSourceTypeAvailable(.camera)
+      result(hasCamera)
+    case "requestCameraPermission":
+      // This should be handled by the permission_handler plugin
+      result(true)
     default:
       result(FlutterMethodNotImplemented)
     }
